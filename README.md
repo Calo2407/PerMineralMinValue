@@ -7,6 +7,10 @@ Per-mineral thresholds for drones, manipulator, and on-board computer. Adds vert
 - Drones, Docking Arm, and OBC respect per-mineral thresholds
 - Tabs UI for each system; Unmarked excluded from sliders
 
+<img width="450" height="300" alt="Global" src="https://github.com/user-attachments/assets/ca40eab1-e90e-4703-a986-faa83ff71e14" />
+<img width="450" height="300" alt="Custom" src="https://github.com/user-attachments/assets/e86cf30d-680f-4e07-bf7c-f89fb32c3c38" />
+
+
 ## Installation (Steam)
 - Open your game install directory
 - Create a new folder called "mods"
