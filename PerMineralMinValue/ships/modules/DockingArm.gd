@@ -3,7 +3,6 @@ extends "res://ships/modules/DockingArm.gd"
 # ------------------------------ Setup / API ------------------------------
 
 func _ready():
-	._ready()
 	if mineralTargetting and ship:
 		var cfg = ship.getConfig(getSlotName("config"), {})
 		if not cfg.has("minerals"):

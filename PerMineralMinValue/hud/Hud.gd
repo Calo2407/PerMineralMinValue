@@ -22,7 +22,6 @@ func setMinValueFor(mineral: String, value: float):
 
 # Beim Booten laden wir existierende Werte
 func _ready():
-	._ready()
 	if mineralTargetting and ship:
 		var cfg = ship.getConfig(getSlotName("config"), {})
 		if "mineralMinValues" in cfg:

@@ -50,7 +50,6 @@ func _from_display_e(ui_v):
 # ---------------- Focus relay ----------------
 
 func _ready():
-	._ready()
 	if has_signal("mineralFocusChanged"):
 		connect("mineralFocusChanged", self, "_onMineralFocusChanged")
 
