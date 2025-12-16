@@ -154,8 +154,15 @@ func _build_system_tab(system_name, ref):
 		else:
 			var p = vpriceBox.instance()
 			p.connect("valueChanged", self, "_onMineralMinChanged", [ref, m])
-			# Start value = 0 E$ (intended)
-			p.value = 0.0
+			
+			# FIX: Read actual start value from system
+			var init_val = 0.0
+			if ref.has_method("getMinValueFor"):
+				var raw = ref.getMinValueFor(m)
+				if raw != null:
+					init_val = _to_display_e(raw)
+			p.value = init_val
+			
 			cell.add_child(p)
 			_custom_price_by_sys_m[_key(ref, m)] = p
 
@@ -280,8 +287,13 @@ func updateSystems(systems):
 
 				var pb = priceBox.instance()
 				pb.connect("valueChanged", self, "value", [ref])
-				# Start value = 0 E$ (intended)
-				pb.value = 0.0
+				
+				# FIX: Read global init value correctly
+				var init_val_global = 0.0
+				if ref.has_method("getMinValue"):
+					init_val_global = _to_display_e(ref.getMinValue())
+				pb.value = init_val_global
+				
 				vanillaGrid.add_child(pb)
 				_global_price_by_sys[_sid(ref)] = pb
 		Tool.release(rlock)

@@ -29,6 +29,33 @@ func getMinValueFor(mineral):
 		return float(mineralConfig["mineralMinValues"].get(mineral, getMinValue()))
 	return getMinValue()
 
+# Required for UI and internal logic (prevents crashes)
+func hasMineralEnabled(mineral):
+	if not mineralConfig.has("minerals"):
+		return true
+	var m = mineralConfig["minerals"]
+	if typeof(m) == TYPE_ARRAY:
+		return m.has(mineral)
+	if typeof(m) == TYPE_DICTIONARY:
+		return m.has(mineral) and m[mineral]
+	return false
+
+# Required for UI toggles to work
+func setMineralConfig(mineral, enabled):
+	if not mineralConfig.has("minerals"):
+		mineralConfig["minerals"] = []
+	
+	var m = mineralConfig["minerals"]
+	if typeof(m) == TYPE_ARRAY:
+		if enabled and not m.has(mineral):
+			m.append(mineral)
+		elif not enabled and m.has(mineral):
+			m.erase(mineral)
+	elif typeof(m) == TYPE_DICTIONARY:
+		m[mineral] = enabled
+		
+	ship.setConfig(getSlotName("config"), mineralConfig)
+
 # ------------------------------ Target validation ------------------------------
 
 func isValidTarget(body):
@@ -76,71 +103,71 @@ func _permin_enabled_minerals() -> Array:
 					out.append(m)
 	return out
 
-# Returns geologist's estimated price if available, otherwise falls back to market price.
-func _geo_estimated_price(m):
-	if CurrentGame and CurrentGame.has_method("getEstimatedMineralPrice"):
-		return float(CurrentGame.getEstimatedMineralPrice(m))
+# Helper: Get cached error factor (Sync with MineralMark)
+func _get_geologist_error_factor(body):
+	if not body: return 1.0
+	
+	if body.has_meta("geo_factor"):
+		return body.get_meta("geo_factor")
+	
+	var accuracy = 1.0
+	if CurrentGame and CurrentGame.has_method("getGeologistAccurancy"):
+		accuracy = CurrentGame.getGeologistAccurancy()
+	
+	var seed_val = body.get_instance_id()
+	var deterministic_rand = CurrentGame.sraf(seed_val)
+	var factor = 1.0 + (deterministic_rand - 0.5) * 2.0 * (1.0 - accuracy)
+	
+	body.set_meta("geo_factor", factor)
+	return factor
 
-	var est_dict = null
-	if CurrentGame:
-		est_dict = CurrentGame.get("estimatedMineralPrices")
-	if typeof(est_dict) == TYPE_DICTIONARY and est_dict.has(m):
-		return float(est_dict[m])
-
-	var geo_dict = null
-	if CurrentGame:
-		geo_dict = CurrentGame.get("geologistPrices")
-	if typeof(geo_dict) == TYPE_DICTIONARY and geo_dict.has(m):
-		return float(geo_dict[m])
-
-	var market = null
-	if CurrentGame:
-		market = CurrentGame.get("mineralPrices")
-	if typeof(market) == TYPE_DICTIONARY and market.has(m):
-		return float(market[m])
-
-	return 0.0
-
-# Returns: true/false if assessed; null if cannot assess (do not block vanilla)
+# Corrected logic: Checks the DISPLAYED TOTAL VALUE
 func _permin_target_meets_threshold(body, minerals: Array):
 	if body == null:
 		return null
 
-	var could_assess_any = false
+	# 1. Get base market value of the WHOLE rock
+	var total_real_value = 0.0
+	if CurrentGame and CurrentGame.has_method("getMarketPrice"):
+		total_real_value = CurrentGame.getMarketPrice(body)
+	else:
+		return null 
 
+	# 2. Apply geologist error
+	var geo_factor = _get_geologist_error_factor(body)
+	var perceived_total_value = total_real_value * geo_factor
+
+	var has_active_threshold = false
+	var passed_active_threshold = false
+
+	# 3. Check all minerals in the rock
 	for m in minerals:
-		var amount = 0.0
-		var have_amount = false
-
-		# Amount in the target body
+		var has_mineral = false
 		if body.has_method("getProcessedCargo"):
-			amount = float(body.getProcessedCargo(m))
-			have_amount = true
+			if body.getProcessedCargo(m) > 0: has_mineral = true
 		else:
 			var comp = body.get("composition")
-			if typeof(comp) == TYPE_DICTIONARY and comp.has(m):
-				amount = float(comp[m])
-				have_amount = true
+			if typeof(comp) == TYPE_DICTIONARY and comp.has(m) and comp[m] > 0:
+				has_mineral = true
 
-		if not have_amount or amount <= 0.0:
+		if not has_mineral:
 			continue
+			
+		# FIX: Convert from kE$ (Slider) to E$ (Market Price)
+		var threshold = getMinValueFor(m) * 1000.0
+		
+		# Only consider sliders that are actually set (>0)
+		if threshold > 0.0:
+			has_active_threshold = true
+			
+			if perceived_total_value >= threshold:
+				passed_active_threshold = true
+				return true
 
-		# Use geologist estimate when available
-		var unit_price = _geo_estimated_price(m)
-		if unit_price <= 0.0:
-			# No estimate yet — skip; do not block overall decision
-			continue
-
-		could_assess_any = true
-
-		# Worth and threshold are in internal units
-		var worth = amount * unit_price
-
-		# print("ARM worth %s for %s vs min %s" % [worth, m, getMinValueFor(m)])
-
-		if worth >= getMinValueFor(m):
-			return true
-
-	if not could_assess_any:
-		return null
-	return false
+	# If we are here, no active limit was met.
+	if has_active_threshold:
+		return false
+		
+	# No active limits (e.g. only water present, but water slider is 0)
+	# -> Let vanilla decide
+	return null

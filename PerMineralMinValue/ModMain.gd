@@ -14,6 +14,7 @@ func _init(modLoader := null):
 	installScriptExtension("hud/SystemMineralList.gd")
 	installScriptExtension("ships/modules/DockingArm.gd")
 	installScriptExtension("weapons/drone-plant.gd")
+	installScriptExtension("hud/MineralMark.gd")
 	# NOTE: We intentionally do NOT override hud/components/PriceLabel.gd
 	# to avoid interfering with vanilla visibility/disabled behavior.
 
